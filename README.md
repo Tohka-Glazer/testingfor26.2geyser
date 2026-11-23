@@ -1,6 +1,12 @@
-# Geyser-Fabric 26.2 + Bedrock 26.66 — backport experiment v2
+# Geyser-Fabric 26.2 + Bedrock 26.66 — backport experiment v3
 
-**NOT a compiled or tested JAR.** This version responds to the GitHub Actions failure where cherry-picking `fd35d59` reported conflicts in `BlockRegistryPopulator.java`, `ItemRegistryPopulator.java`, the removed `WildernessBoundConverter.java`, and `core/src/main/resources/mappings`.
+**NOT a compiled or tested JAR.** v3 addresses a newer API mismatch after v2 reached the Java compiler (`NetherNetServer.java` uses the removed `setProxyProtocol(boolean)` method). v2 addressed the GitHub Actions failure where cherry-picking `fd35d59` reported conflicts in `BlockRegistryPopulator.java`, `ItemRegistryPopulator.java`, the removed `WildernessBoundConverter.java`, and `core/src/main/resources/mappings`.
+
+## What changed in v3
+
+The newer Cloudburst Network dependency removed the `NetherNetHTTPServerSignaling.Builder.setProxyProtocol(boolean)` method. Geyser's current upstream source likewise omits this call and retains `.setProxyProtocolProxies(...)`. v3 removes only that obsolete setter call; it does not disable all proxy handling or change your Fabric 26.2 mappings. This specifically fixes the Java compilation error shown at `NetherNetServer.java:222`.
+
+This is based on inspection of upstream Geyser source, **not** a verified compilation or game-connection test. A successful build may still have runtime problems.
 
 ## What changed from v1
 
@@ -16,7 +22,7 @@ It avoids the **specific Git merge conflicts** in v1. It does not guarantee a su
 
 ## Run on GitHub Actions
 
-Replace the original `build.sh` with this new `build.sh`. The `.github/workflows/experimental-build.yml` workflow can remain the same; it's included for convenience. Commit and push the change, then go to **Actions → Experimental Geyser 26.2 + Bedrock 26.66 build → Run workflow**.
+Replace the original `build.sh` with this v3 `build.sh`. The `.github/workflows/experimental-build.yml` workflow can remain the same; it's included for convenience. Commit and push the change, then go to **Actions → Experimental Geyser 26.2 + Bedrock 26.66 build → Run workflow**.
 
 If the build succeeds, the Actions artifact ZIP should contain a `.jar`. This is *still not validated* as compatible. Before trying it on BisectHosting, back up the server and test on a separate copy first.
 

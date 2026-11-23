@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # EXPERIMENTAL, unverified source backport for Java 26.2 / Bedrock 26.66.
+# v3: adapts removed NetherNet signaling Builder.setProxyProtocol API.
 # This version deliberately DOES NOT cherry-pick fd35d59 because it conflicts
 # with Java 26.2's registries and mapping submodule.
 set -Eeuo pipefail
@@ -86,6 +87,14 @@ modify(Path('network/bedrock/CodecProcessor.java'), [
      '            codecBuilder.updateSerializer(ServerboundMatchmakingCancelPacket.class, IGNORED_SERIALIZER);\n'
      '        }\n'
      '        return codecBuilder.build();'),
+])
+
+# New Cloudburst Network Builder removed setProxyProtocol(boolean).
+# Follow Geyser upstream: the trusted-proxies setter remains, but there is
+# no longer a separate Boolean switch on the signaling Builder.
+modify(Path('network/bedrock/nethernet/NetherNetServer.java'), [
+    ('                    .setProxyProtocol(geyser.config().advanced().bedrock().useHaproxyProtocol())\n',
+     ''),
 ])
 
 # Keep Minecraft Java 26.2 pins, but use the updated Cloudburst Bedrock transport
