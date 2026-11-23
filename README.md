@@ -1,6 +1,37 @@
-# Experimental Geyser Fabric 26.2 + Bedrock 26.66 backport — V4
+# V5 syntax-fixed Geyser Fabric Java 26.2 / Bedrock 26.66 experiment
 
-## Why the previous custom JAR crashed
+**STATUS: NOT A COMPILED OR VERIFIED JAR.** This ZIP corrects the V4 GitHub Actions `SyntaxError` and keeps the V4 Java block-state backport. A successful shell/Python syntax test does **not** establish that Gradle builds, that the server starts, or that Bedrock players can join.
+
+## What caused V4's error
+
+`build.sh` opened a Python heredoc with `python3 - <<'PY'` and, before closing it, included a second Bash `python3 - <<'PY_V4'` command. The first Python interpreter hit this Bash command on line 75 and returned `SyntaxError: invalid syntax`.
+
+V5 moves each Python patch into a separate file in `patches/`. They run consecutively via Bash, removing the nested heredoc risk. The GitHub Actions workflow now uses `bash -n` and `python3 -m py_compile` before cloning.
+
+## Recommended alternative: supported external proxy
+
+The Geyser team's documented path for an older Fabric server is **ViaProxy with the Geyser-ViaProxy plugin**. This usually avoids maintaining a custom Geyser-Fabric backport and lets the BisectHosting server stay on Fabric 26.2. ViaProxy must run as a **separate Java process** (not in the Fabric `mods/` folder), on a host or hosting plan that can run it. Install the latest compatible Geyser-ViaProxy, enable `bedrock.transport: nethernet`, ensure a reachable separate TCP + UDP port for Bedrock players, and point ViaProxy at the existing Java 26.2 server. Check that the Geyser build advertises Bedrock 26.66 before deploying; use staging first. With the CLI and Java online-mode authentication, account setup/Floodgate may be needed.
+
+Official instructions:
+- https://geysermc.org/wiki/geyser/supported-versions/
+- https://geysermc.org/wiki/geyser/setup/
+- https://github.com/ViaVersion/ViaProxy
+- https://geysermc.org/download/
+
+## To test the corrected experimental V5 build recipe
+
+1. Upload **all** contents of this ZIP (including `patches/` and `.github/`) to your GitHub recipe repository, replacing V4 files.
+2. Run **Actions → Experimental Geyser 26.2 + Bedrock 26.66 build → Run workflow**.
+3. The first step checks shell and Python syntax. The next attempts the Geyser source backport and Gradle compile. On failure inspect the **first real error**, not just the final `Process completed with exit code 1`.
+4. An artifact is uploaded **only if Gradle succeeds**. It remains experimental; test on a backed-up server with a real Bedrock 26.66 client.
+
+No compiled `.jar` is included. For Bedrock 26.60+, a Bedrock-facing Geyser port must work over **both TCP and UDP**, independently of the Java server port. Contact BisectHosting support about network allocation and whether a separate proxy process is allowed. This V5 deliberately leaves Java/Fabric dependency pins and the original mapping submodule untouched, so further failures are possible.
+
+---
+
+## Technical background from V4
+
+
 
 V3 successfully compiled, but your BisectHosting log reported `Unable to find minecraft:fire[age=0,...] Bedrock runtime ID for 26_60!`. The Java 26.2 mapping submodule contains `minecraft:fire` with `age` only, while Bedrock 26.60 added the `minecraft:connection_*` directional block states. V3's 26.60 palette mapping used `tag -> tag`, so the block state had no matching Bedrock runtime ID.
 
