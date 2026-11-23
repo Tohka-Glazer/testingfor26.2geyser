@@ -1,59 +1,36 @@
-# V5 syntax-fixed Geyser Fabric Java 26.2 / Bedrock 26.66 experiment
+# V6: Geyser-Fabric Java 26.2 / Bedrock 26.66 block-state backport
 
-**STATUS: NOT A COMPILED OR VERIFIED JAR.** This ZIP corrects the V4 GitHub Actions `SyntaxError` and keeps the V4 Java block-state backport. A successful shell/Python syntax test does **not** establish that Gradle builds, that the server starts, or that Bedrock players can join.
+**Source recipe — NOT a prebuilt, compiled, or fully validated JAR.** Does not install or require ViaProxy. Uses the existing Geyser-Fabric mod and Fabric 26.2 branch.
 
-## What caused V4's error
+## What failed in the latest BisectHosting startup log
 
-`build.sh` opened a Python heredoc with `python3 - <<'PY'` and, before closing it, included a second Bash `python3 - <<'PY_V4'` command. The first Python interpreter hit this Bash command on line 75 and returned `SyntaxError: invalid syntax`.
+Geyser 2.11.3-SNAPSHOT (git-DEV-bbd7e67) loads, then aborts while resolving the Bedrock `26_60` block registry:
 
-V5 moves each Python patch into a separate file in `patches/`. They run consecutively via Bash, removing the nested heredoc risk. The GitHub Actions workflow now uses `bash -n` and `python3 -m py_compile` before cloning.
+`Unable to find minecraft:redstone_wire[east=up,north=up,power=0,south=up,west=up] Bedrock runtime ID for 26_60!`
 
-## Recommended alternative: supported external proxy
+The Java 26.2 mapping NBT contains `redstone_signal: 0`, but the Bedrock 26.60 palette also requires `redstone_north`, `redstone_east`, `redstone_south`, `redstone_west`, with string values `none`, `side`, or `up`. V5's converter covers `fire` and `chorus_plant` only, so the redstone state fails to resolve.
 
-The Geyser team's documented path for an older Fabric server is **ViaProxy with the Geyser-ViaProxy plugin**. This usually avoids maintaining a custom Geyser-Fabric backport and lets the BisectHosting server stay on Fabric 26.2. ViaProxy must run as a **separate Java process** (not in the Fabric `mods/` folder), on a host or hosting plan that can run it. Install the latest compatible Geyser-ViaProxy, enable `bedrock.transport: nethernet`, ensure a reachable separate TCP + UDP port for Bedrock players, and point ViaProxy at the existing Java 26.2 server. Check that the Geyser build advertises Bedrock 26.66 before deploying; use staging first. With the CLI and Java online-mode authentication, account setup/Floodgate may be needed.
+## V6 changes
 
-Official instructions:
-- https://geysermc.org/wiki/geyser/supported-versions/
-- https://geysermc.org/wiki/geyser/setup/
-- https://github.com/ViaVersion/ViaProxy
-- https://geysermc.org/download/
+- Extends `patches/02-directional-block-mappings.py` with redstone wire handling. Reads all four directions directly from the Java block-state ID, preserves the original `redstone_signal`, builds a full Bedrock NBT state, and looks it up in the authoritative 26.60 palette.
+- Accepts only `none`, `side`, or `up` directional values. An unrecognized value or unmatchable state fails visibly (no made-up runtime IDs, substitutions, or crash suppression).
+- Keeps V5's fire/chorus-plant directional handling, Bedrock 26.60–26.66 protocol registration, Java 26.2/Fabric dependency pins, NetherNet compatibility adjustment, and syntax checks.
+- Does not replace the Java 26.2 mapping submodule with newer 26.3 mappings.
 
-## To test the corrected experimental V5 build recipe
+## Build using GitHub Actions
 
-1. Upload **all** contents of this ZIP (including `patches/` and `.github/`) to your GitHub recipe repository, replacing V4 files.
-2. Run **Actions → Experimental Geyser 26.2 + Bedrock 26.66 build → Run workflow**.
-3. The first step checks shell and Python syntax. The next attempts the Geyser source backport and Gradle compile. On failure inspect the **first real error**, not just the final `Process completed with exit code 1`.
-4. An artifact is uploaded **only if Gradle succeeds**. It remains experimental; test on a backed-up server with a real Bedrock 26.66 client.
+1. Replace the build-recipe repository files with **all contents** of this ZIP, preserving `.github/workflows/` and `patches/`.
+2. Run **Actions → Experimental Geyser 26.2 + Bedrock 26.66 build → Run workflow**. The workflow syntax-checks scripts, clones the Java 26.2 Geyser source revision, applies the patches, and attempts `:fabric:build` using Java 25.
+3. If successful, download the `.jar` inside the Actions artifact. The output is experimental, not verified as a working Bedrock connection.
+4. Back up your BisectHosting server and preferably test on a clone. Stop the server, remove the previous `geyser-fabric` jar from `mods/` (never keep both), upload the newly built jar, keep Floodgate and Fabric API, and restart.
+5. If it still fails, check the **first** `26_60 missing block mapping` / `Unable to find ... Bedrock runtime ID` message or compile error and use that for the next targeted diagnosis.
 
-No compiled `.jar` is included. For Bedrock 26.60+, a Bedrock-facing Geyser port must work over **both TCP and UDP**, independently of the Java server port. Contact BisectHosting support about network allocation and whether a separate proxy process is allowed. This V5 deliberately leaves Java/Fabric dependency pins and the original mapping submodule untouched, so further failures are possible.
+For NetherNet (Bedrock 26.60+), BisectHosting must provide a reachable Geyser port for TCP signaling **and** UDP gameplay. Configure Geyser's Bedrock transport correctly; a working server boot alone doesn't prove clients can connect.
 
----
+## Source references
 
-## Technical background from V4
+- Original Geyser 26.2 source: https://github.com/GeyserMC/Geyser/commit/bbd7e67
+- Geyser 26.60 upstream changes: https://github.com/GeyserMC/Geyser/commit/fd35d59
+- Upstream 26.60 state converter: https://github.com/GeyserMC/Geyser/blob/fd35d59/core/src/main/java/org/geysermc/geyser/registry/populator/conversion/ICanHasMoreStates.java
 
-
-
-V3 successfully compiled, but your BisectHosting log reported `Unable to find minecraft:fire[age=0,...] Bedrock runtime ID for 26_60!`. The Java 26.2 mapping submodule contains `minecraft:fire` with `age` only, while Bedrock 26.60 added the `minecraft:connection_*` directional block states. V3's 26.60 palette mapping used `tag -> tag`, so the block state had no matching Bedrock runtime ID.
-
-See the official Geyser Bedrock-26.60 conversion source:
-https://github.com/GeyserMC/Geyser/blob/fd35d59/core/src/main/java/org/geysermc/geyser/registry/populator/conversion/ICanHasMoreStates.java
-
-## V4 changes
-
-- Retains V3's exact Java 26.2 mappings, Fabric dependencies and NetherNet API fix.
-- On a missing 26.60 mapping for **fire** or **chorus plant**, examines the 26.60 palette entries. It matches pre-existing states exactly, and matches any newly-added `minecraft:connection_*` Boolean properties to the Java block-state direction flags.
-- Rejects missing, non-Boolean or ambiguous candidate mappings instead of inventing a runtime ID or silently selecting a wrong block.
-- For all remaining mismatches, logs 3 examples of the matching Bedrock palette entry so we can diagnose subsequent fixes.
-- Does **not** alter the world, repair corrupted chunks, turn off validations, replace fire with another block, or change authentication/ports.
-
-**Important:** this only addresses the category of failure exposed by the current log. Other Java26.2/Bedrock26.60 mismatches may still exist (redstone wire, items, other Bedrock protocol changes). This build has **not** been compiled or tested here, and may fail at build time, startup, or connection. The current Bedrock 26.66 connection is not verified. This is a build recipe, not a functioning JAR.
-
-## GitHub Actions steps
-
-1. Copy `build.sh` from this ZIP to the root of the same GitHub Actions recipe repository, replacing the V3 version.
-2. Commit changes; open Actions and run the existing experimental workflow.
-3. If Actions succeeds, download the `.jar` from the artifact ZIP.
-4. **Use a separate/staging server or fully backed-up copy of BisectHosting server** to test. Do not deploy experimental jars into a production server where players have data at risk.
-5. If the test server still crashes, provide the FIRST new `Unable to find ...` error and the `26_60 missing block mapping` line. Those lines will show the next missing conversion.
-
-To immediately restore the server, stop it, remove the experimental V3 JAR, reinstall the last known-good matching Java 26.2 Geyser build (which may not support latest Bedrock), and restart.
+**Limitations:** The full Geyser/Fabric Gradle build and a real server/client test could not be run here. There could be additional 26.60 mapping changes, item translation issues, custom-block issues, or NetherNet networking problems after this specific redstone failure is fixed. This patch must not be treated as a production-ready release until those tests pass.

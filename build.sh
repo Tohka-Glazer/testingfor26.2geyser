@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # EXPERIMENTAL, unverified source backport for Java 26.2 / Bedrock 26.66.
-# v5: fixes V4 script syntax and preserves the V4 mapping adapter; adds a narrow Java 26.2 -> Bedrock 26.60 directional state bridge.
+# v6: builds on v5 and maps Java 26.2 redstone-wire connections to Bedrock 26.60 directional states, retaining fire/chorus fixes.
 # Does not invent runtime IDs. NOT YET BUILD/STARTUP/CLIENT TESTED.
 # This version deliberately DOES NOT cherry-pick fd35d59 because it conflicts
 # with Java 26.2's registries and mapping submodule.
