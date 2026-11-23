@@ -20,13 +20,29 @@ method_anchor='    private static NbtMap buildBedrockState(BlockState state, Nbt
 if s.count(method_anchor) != 1:
     raise SystemExit(f'ERROR: expected one buildBedrockState declaration, got {s.count(method_anchor)}')
 method = '''    /**
-     * Adapt 26.2-era fire and chorus states to the Bedrock 26.60 palette.
-     * This is intentionally strict: never choose a palette entry unless all
-     * pre-existing states and all new directional Boolean states match.
+     * Adapt Java 26.2-era fire, chorus, and redstone-wire block states to the
+     * Bedrock 26.60 palette. Match against the palette itself; never guess a
+     * runtime ID, or silently degrade to a different block state.
      */
     private static GeyserBedrockBlock findDirectional26_60Block(NbtMap source, String javaId,
                                                                   Map<NbtMap, GeyserBedrockBlock> palette) {
         String blockName = source.getString("name");
+        if ("minecraft:redstone_wire".equals(blockName)) {
+            // Java 26.2 mapping NBT has redstone_signal but not the four
+            // directional redstone_* properties required by Bedrock 26.60.
+            // The Java block state has exactly the direction strings we need.
+            NbtMapBuilder states = source.getCompound("states").toBuilder();
+            for (String direction : new String[]{"north", "east", "south", "west"}) {
+                String connection = javaBlockProperty(javaId, direction);
+                if (!"none".equals(connection) && !"side".equals(connection) && !"up".equals(connection)) {
+                    return null;
+                }
+                states.putString("redstone_" + direction, connection);
+            }
+            NbtMapBuilder corrected = source.toBuilder();
+            corrected.putCompound("states", states.build());
+            return palette.get(corrected.build());
+        }
         if (!"minecraft:fire".equals(blockName) && !"minecraft:chorus_plant".equals(blockName)) {
             return null;
         }
@@ -79,24 +95,27 @@ method = '''    /**
         return found;
     }
 
-    private static Boolean javaDirection(String javaId, String direction) {
+    private static String javaBlockProperty(String javaId, String propertyName) {
         int start = javaId.indexOf('[');
         int end = javaId.indexOf(']', start + 1);
         if (start < 0 || end < 0) {
             return null;
         }
-        String[] properties = javaId.substring(start + 1, end).split(",");
-        for (String property : properties) {
-            if (property.startsWith(direction + "=")) {
-                String value = property.substring(direction.length() + 1);
-                if ("true".equals(value)) {
-                    return true;
-                }
-                if ("false".equals(value)) {
-                    return false;
-                }
-                return null;
+        for (String property : javaId.substring(start + 1, end).split(",")) {
+            if (property.startsWith(propertyName + "=")) {
+                return property.substring(propertyName.length() + 1);
             }
+        }
+        return null;
+    }
+
+    private static Boolean javaDirection(String javaId, String direction) {
+        String value = javaBlockProperty(javaId, direction);
+        if ("true".equals(value)) {
+            return true;
+        }
+        if ("false".equals(value)) {
+            return false;
         }
         return null;
     }
@@ -104,4 +123,4 @@ method = '''    /**
 '''
 s=s.replace(method_anchor,method+method_anchor)
 p.write_text(s)
-print('Added strict 26_60 fire/chorus state adapter and palette diagnostics')
+print('Added strict Bedrock 26.60 redstone/fire/chorus state adapters and palette diagnostics')
